@@ -13,12 +13,13 @@ pub struct OutboundConnection {
 impl OutboundConnection {
     pub fn connect(
         address: SocketAddr,
-        channel: ApprovedChannel,
+        mut channel: ApprovedChannel,
         timeout: Duration,
     ) -> io::Result<Self> {
         if timeout.is_zero() || timeout > Duration::from_secs(15) {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid timeout"));
         }
+        channel.require_approval()?;
         let stream = TcpStream::connect_timeout(&address, timeout)?;
         stream.set_read_timeout(Some(timeout))?;
         stream.set_write_timeout(Some(timeout))?;
@@ -84,6 +85,18 @@ mod tests {
         assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
         connection.close();
         peer.join().unwrap();
+    }
+
+    #[test]
+    fn refuses_network_connection_before_local_approval() {
+        let address: SocketAddr = "127.0.0.1:1".parse().unwrap();
+        let error = match OutboundConnection::connect(
+            address, channel(), Duration::from_secs(1)
+        ) {
+            Ok(_) => panic!("unapproved connection unexpectedly succeeded"),
+            Err(error) => error,
+        };
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
     }
 
     #[test]
