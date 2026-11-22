@@ -1,4 +1,5 @@
 mod protocol;
+mod crypto;
 use protocol::{Envelope, MessageKind};
 
 fn main() {
