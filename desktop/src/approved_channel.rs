@@ -28,6 +28,13 @@ impl ApprovedChannel {
 
     pub fn gate_mut(&mut self) -> &mut SessionGate { &mut self.gate }
 
+    /// Fail closed before opening a network socket, not just before sending data.
+    pub fn require_approval(&mut self) -> io::Result<()> {
+        if self.gate.may_exchange_data() { Ok(()) } else {
+            Err(io::Error::new(io::ErrorKind::PermissionDenied, "local consent required"))
+        }
+    }
+
     pub fn send<W: Write>(&mut self, output: &mut W, plaintext: &[u8]) -> io::Result<()> {
         if !self.gate.may_exchange_data() {
             return Err(io::Error::new(io::ErrorKind::PermissionDenied, "local consent required"));
