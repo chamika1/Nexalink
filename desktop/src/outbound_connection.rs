@@ -78,9 +78,13 @@ mod tests {
             assert_eq!(stream.read(&mut buffer).unwrap(), 0);
         });
         use std::io::Read;
+        let mut approved = channel();
+        approved.gate_mut().identity_verified().unwrap();
+        approved.gate_mut().approve_locally(Duration::from_secs(60)).unwrap();
         let mut connection = OutboundConnection::connect(
-            address, channel(), Duration::from_secs(2)
+            address, approved, Duration::from_secs(2)
         ).unwrap();
+        connection.channel.gate_mut().revoke();
         let error = connection.send(b"not authorized").unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
         connection.close();
