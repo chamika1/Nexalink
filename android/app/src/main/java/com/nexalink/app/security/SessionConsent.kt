@@ -26,9 +26,11 @@ class SessionConsent {
     ) {
         require(peerId.isNotBlank())
         require(approvedByUser) { "Explicit user approval required" }
-        require(durationMillis in 1..3_600_000L) { "Maximum grant is one hour" }
+        require(durationMillis in 1..900_000L) { "Maximum grant is fifteen minutes" }
+        require(nowMillis >= 0) { "Invalid clock value" }
+        val expiry = Math.addExact(nowMillis, durationMillis)
         grants[peerId to capability] = CapabilityGrant(
-            capability, peerId, nowMillis + durationMillis, true
+            capability, peerId, expiry, true
         )
     }
 
