@@ -1,6 +1,7 @@
 mod protocol;
 mod crypto;
 mod transport;
+mod secure_frame;
 use protocol::{Envelope, MessageKind};
 
 fn main() {
