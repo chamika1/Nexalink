@@ -1,9 +1,11 @@
 package com.nexalink.app.security
 
 import android.content.Context
-import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
+import java.security.KeyFactory
+import java.security.spec.X509EncodedKeySpec
+import java.util.Base64
 
 /**
  * Local registry of explicitly approved peer public keys.
@@ -30,6 +32,9 @@ class TrustedPeerStore(context: Context) {
     @Synchronized fun addVerified(name: String, encodedPublicKey: String, confirmedByUser: Boolean): Peer {
         require(confirmedByUser) { "Explicit user approval required" }
         val invitation = PairingInvitation(1, name, encodedPublicKey)
+        val bytes = Base64.getUrlDecoder().decode(encodedPublicKey)
+        require(bytes.size in 64..512) { "Invalid public key" }
+        KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(bytes))
         val id = invitation.fingerprint()
         val peer = Peer(id, name, encodedPublicKey, System.currentTimeMillis())
         val all = list().filterNot { it.id == id } + peer
