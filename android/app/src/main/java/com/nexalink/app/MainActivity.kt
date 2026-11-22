@@ -22,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.nexalink.app.ui.PairingScreen
 
 private enum class HomeTab(val title: String) {
     DEVICES("Devices"), CHAT("Chat"), LOCATION("Location")
@@ -66,7 +67,7 @@ private fun NexaLinkHome() {
                     }
                     if (showPairingInfo) {
                         Text("Pairing preview only. Secure QR pairing and device verification are not implemented yet.")
-                        Text("Future flow: scan QR → verify both devices → approve pairing.")
+                        PairingScreen()
                     }
                 }
                 HomeTab.CHAT -> {
