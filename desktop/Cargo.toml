@@ -7,3 +7,8 @@ description = "NexaLink Windows companion protocol prototype"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+aes-gcm = "0.10"
+hkdf = "0.12"
+sha2 = "0.10"
+p256 = { version = "0.13", features = ["ecdh", "pkcs8"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
