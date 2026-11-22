@@ -4,6 +4,7 @@ mod transport;
 mod secure_frame;
 mod session_gate;
 mod approved_channel;
+mod outbound_connection;
 use protocol::{Envelope, MessageKind};
 
 fn main() {
