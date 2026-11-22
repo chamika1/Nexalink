@@ -3,6 +3,7 @@ mod crypto;
 mod transport;
 mod secure_frame;
 mod session_gate;
+mod approved_channel;
 use protocol::{Envelope, MessageKind};
 
 fn main() {
