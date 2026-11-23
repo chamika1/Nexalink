@@ -60,9 +60,11 @@ impl ApprovedChannel {
                 // Any timeout or disconnect can occur after a partial frame read.
                 // A malformed, truncated or unauthenticated frame also makes the
                 // stream untrustworthy. Require a fresh approved session.
-                if matches!(error.kind(), io::ErrorKind::InvalidData | io::ErrorKind::UnexpectedEof | io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock | io::ErrorKind::ConnectionReset | io::ErrorKind::BrokenPipe | io::ErrorKind::ConnectionAborted) {
-                    self.close();
-                }
+                // All receive failures are terminal. Custom readers may
+                // report partial-frame I/O failures as Other, Interrupted,
+                // or platform-specific kinds. Continuing would risk frame
+                // desynchronization or accepting attacker-controlled bytes.
+                self.close();
                 Err(error)
             }
         }
@@ -173,6 +175,34 @@ mod tests {
             .unwrap_err().kind(), io::ErrorKind::TimedOut);
         assert_eq!(channel.send(&mut Vec::new(), b"retry")
             .unwrap_err().kind(), io::ErrorKind::PermissionDenied);
+    }
+
+    #[test]
+    fn unknown_io_error_after_partial_frame_revokes_session() {
+        struct OtherErrorReader { started: bool }
+        impl Read for OtherErrorReader {
+            fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+                if !self.started {
+                    self.started = true;
+                    buf[0] = 0;
+                    return Ok(1);
+                }
+                Err(io::Error::new(io::ErrorKind::Other, "unexpected reader failure"))
+            }
+        }
+        let mut channel = channel();
+        channel.gate_mut().identity_verified().unwrap();
+        channel.gate_mut().approve_locally(Duration::from_secs(60)).unwrap();
+        assert_eq!(
+            channel.receive(&mut OtherErrorReader { started: false })
+                .unwrap_err().kind(),
+            io::ErrorKind::Other
+        );
+        assert_eq!(
+            channel.send(&mut Vec::new(), b"must not retry")
+                .unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
     }
 
     #[test]
