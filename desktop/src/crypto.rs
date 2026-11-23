@@ -45,6 +45,9 @@ impl EphemeralKey {
 }
 
 /// Format: big-endian u64 sequence || 12-byte random nonce || ciphertext || GCM tag.
+/// Plaintext is capped at 48,000 bytes so base64 encoding of the 36-byte
+/// framing/tag overhead stays within protocol::MAX_PAYLOAD_BYTES (65,536).
+const MAX_PLAINTEXT_BYTES: usize = 48_000;
 /// AAD: transcript bytes || big-endian u64 sequence.
 pub struct SessionCipher {
     cipher: Aes256Gcm,
@@ -67,7 +70,7 @@ impl SessionCipher {
     }
 
     pub fn encrypt(&mut self, plaintext: &[u8]) -> Result<Vec<u8>, &'static str> {
-        if plaintext.len() > 60_000 { return Err("plaintext too large"); }
+        if plaintext.len() > MAX_PLAINTEXT_BYTES { return Err("plaintext too large"); }
         let sequence = self.next_sequence;
         self.next_sequence = self.next_sequence.checked_add(1).ok_or("sequence exhausted")?;
         let mut nonce_bytes = [0u8; 12];
@@ -84,7 +87,7 @@ impl SessionCipher {
     }
 
     pub fn decrypt(&mut self, frame: &[u8]) -> Result<Vec<u8>, &'static str> {
-        if !(36..=60_036).contains(&frame.len()) { return Err("invalid frame length"); }
+        if !(36..=MAX_PLAINTEXT_BYTES + 36).contains(&frame.len()) { return Err("invalid frame length"); }
         let sequence = u64::from_be_bytes(frame[..8].try_into().map_err(|_| "invalid sequence")?);
         // TCP frames must arrive in order. Reject gaps, reordering and replay
         // without retaining an unbounded set of all received sequence numbers.
@@ -140,6 +143,26 @@ mod tests {
         assert_eq!(receiver.decrypt(&first).unwrap(), b"first");
         assert_eq!(receiver.decrypt(&second).unwrap(), b"second");
         assert!(receiver.decrypt(&first).is_err());
+    }
+
+    #[test]
+    fn maximum_payload_fits_protocol_wire_limits() {
+        use crate::protocol::{Envelope, MessageKind, MAX_PAYLOAD_BYTES};
+        use crate::transport::write_envelope;
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+        let key = [17u8; 32];
+        let mut sender = SessionCipher::new(&key, b"bounded transcript").unwrap();
+        let mut receiver = SessionCipher::new(&key, b"bounded transcript").unwrap();
+        let plaintext = vec![42u8; MAX_PLAINTEXT_BYTES];
+        let frame = sender.encrypt(&plaintext).unwrap();
+        let mut envelope = Envelope::new(MessageKind::EncryptedData, "session-12345678".into());
+        envelope.payload = URL_SAFE_NO_PAD.encode(&frame);
+        assert!(envelope.payload.len() <= MAX_PAYLOAD_BYTES);
+        let mut wire = Vec::new();
+        write_envelope(&mut wire, &envelope).unwrap();
+        assert_eq!(receiver.decrypt(&frame).unwrap(), plaintext);
+        assert!(sender.encrypt(&vec![0u8; MAX_PLAINTEXT_BYTES + 1]).is_err());
+        assert!(receiver.decrypt(&vec![0u8; MAX_PLAINTEXT_BYTES + 37]).is_err());
     }
 
     #[test]
