@@ -9,6 +9,7 @@ mod handshake_verifier;
 mod verified_session;
 mod session_transcript;
 mod handshake_replay;
+mod session_assembly;
 use protocol::{Envelope, MessageKind};
 
 fn main() {
