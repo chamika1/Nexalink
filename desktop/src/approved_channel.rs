@@ -46,7 +46,18 @@ impl ApprovedChannel {
         if !self.gate.may_exchange_data() {
             return Err(io::Error::new(io::ErrorKind::PermissionDenied, "local consent required"));
         }
-        secure_frame::receive(input, &mut self.inbound, &self.session_id)
+        match secure_frame::receive(input, &mut self.inbound, &self.session_id) {
+            Ok(plaintext) => Ok(plaintext),
+            Err(error) => {
+                // A malformed, truncated or unauthenticated frame makes the
+                // stream untrustworthy. Do not continue on a desynchronized
+                // cipher/transport state; require a fresh approved session.
+                if matches!(error.kind(), io::ErrorKind::InvalidData | io::ErrorKind::UnexpectedEof) {
+                    self.close();
+                }
+                Err(error)
+            }
+        }
     }
 
     pub fn close(&mut self) { self.gate.revoke(); }
@@ -92,6 +103,22 @@ mod tests {
         let mut after_close = Vec::new();
         assert_eq!(channel.send(&mut after_close, b"blocked").unwrap_err().kind(), io::ErrorKind::PermissionDenied);
         assert!(after_close.is_empty());
+    }
+
+    #[test]
+    fn corrupted_ciphertext_revokes_approval_and_blocks_followup() {
+        let mut channel = channel();
+        channel.gate_mut().identity_verified().unwrap();
+        channel.gate_mut().approve_locally(Duration::from_secs(60)).unwrap();
+        let mut wire = Vec::new();
+        channel.send(&mut wire, b"authenticated message").unwrap();
+        // Preserve valid JSON framing but substitute a different session ID.
+        // This is an authenticated transport violation, not a recoverable retry.
+        let start = wire.windows(b"session-12345678".len())
+            .position(|w| w == b"session-12345678").unwrap();
+        wire[start] = b'X';
+        assert_eq!(channel.receive(&mut Cursor::new(wire)).unwrap_err().kind(), io::ErrorKind::InvalidData);
+        assert_eq!(channel.send(&mut Vec::new(), b"after invalid frame").unwrap_err().kind(), io::ErrorKind::PermissionDenied);
     }
 
     #[test]
