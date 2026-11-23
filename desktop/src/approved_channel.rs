@@ -57,10 +57,10 @@ impl ApprovedChannel {
         match secure_frame::receive(input, &mut self.inbound, &self.session_id) {
             Ok(plaintext) => Ok(plaintext),
             Err(error) => {
-                // A malformed, truncated or unauthenticated frame makes the
-                // stream untrustworthy. Do not continue on a desynchronized
-                // cipher/transport state; require a fresh approved session.
-                if matches!(error.kind(), io::ErrorKind::InvalidData | io::ErrorKind::UnexpectedEof) {
+                // Any timeout or disconnect can occur after a partial frame read.
+                // A malformed, truncated or unauthenticated frame also makes the
+                // stream untrustworthy. Require a fresh approved session.
+                if matches!(error.kind(), io::ErrorKind::InvalidData | io::ErrorKind::UnexpectedEof | io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock | io::ErrorKind::ConnectionReset | io::ErrorKind::BrokenPipe | io::ErrorKind::ConnectionAborted) {
                     self.close();
                 }
                 Err(error)
@@ -151,6 +151,28 @@ mod tests {
             io::ErrorKind::BrokenPipe);
         assert_eq!(channel.send(&mut Vec::new(), b"retry").unwrap_err().kind(),
             io::ErrorKind::PermissionDenied);
+    }
+
+    #[test]
+    fn partial_read_timeout_revokes_session_and_prevents_retry() {
+        struct TimeoutReader { sent: bool }
+        impl Read for TimeoutReader {
+            fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+                if !self.sent {
+                    self.sent = true;
+                    buf[0] = 0;
+                    return Ok(1);
+                }
+                Err(io::Error::new(io::ErrorKind::TimedOut, "partial frame timeout"))
+            }
+        }
+        let mut channel = channel();
+        channel.gate_mut().identity_verified().unwrap();
+        channel.gate_mut().approve_locally(Duration::from_secs(60)).unwrap();
+        assert_eq!(channel.receive(&mut TimeoutReader { sent: false })
+            .unwrap_err().kind(), io::ErrorKind::TimedOut);
+        assert_eq!(channel.send(&mut Vec::new(), b"retry")
+            .unwrap_err().kind(), io::ErrorKind::PermissionDenied);
     }
 
     #[test]
