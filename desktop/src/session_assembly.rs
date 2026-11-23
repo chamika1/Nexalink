@@ -13,6 +13,8 @@ pub struct SignedSession<'a> {
     pub session_id: &'a str,
     pub local_ephemeral: &'a EphemeralKey,
     pub remote_ephemeral_spki: &'a [u8],
+    /// Trusted peer identity from pairing/storage, never copied from the handshake.
+    pub expected_remote_identity_spki: &'a [u8],
     pub initiator_identity_spki: &'a [u8],
     pub responder_identity_spki: &'a [u8],
     pub initiator_ephemeral_spki: &'a [u8],
@@ -41,6 +43,15 @@ pub fn assemble_approved_channel(
     }
     if approval_lifetime.is_zero() || approval_lifetime > Duration::from_secs(15 * 60) {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid consent duration"));
+    }
+    let presented_remote = if session.local_is_initiator {
+        session.responder_identity_spki
+    } else {
+        session.initiator_identity_spki
+    };
+    if session.expected_remote_identity_spki.is_empty()
+        || session.expected_remote_identity_spki != presented_remote {
+        return Err(io::Error::new(io::ErrorKind::PermissionDenied, "remote identity does not match trusted pin"));
     }
     let transcript = crate::session_transcript::build_transcript(
         session.initiator_identity_spki,
@@ -103,6 +114,7 @@ mod tests {
             session_id: "session-12345678",
             local_ephemeral: &a,
             remote_ephemeral_spki: &b_pub,
+            expected_remote_identity_spki: b_spki.as_bytes(),
             initiator_identity_spki: a_spki.as_bytes(),
             responder_identity_spki: b_spki.as_bytes(),
             initiator_ephemeral_spki: &a_pub,
@@ -113,6 +125,15 @@ mod tests {
             remote_signature: b_sig.as_bytes(),
             local_is_initiator: true,
         };
+        // A valid self-signed handshake must NOT authorize a different pinned peer.
+        let wrong_id = SigningKey::random(&mut OsRng);
+        let wrong_pin = wrong_id.verifying_key().to_public_key_der().unwrap();
+        let mut rejected = request();
+        rejected.expected_remote_identity_spki = wrong_pin.as_bytes();
+        let mut pin_replay = HandshakeReplayGuard::new(32).unwrap();
+        assert_eq!(assemble_approved_channel(
+            rejected, &mut pin_replay, true, Duration::from_secs(60)
+        ).err().unwrap().kind(), io::ErrorKind::PermissionDenied);
         let mut replay = HandshakeReplayGuard::new(32).unwrap();
         assert_eq!(assemble_approved_channel(
             request(), &mut replay, false, Duration::from_secs(60)
@@ -129,6 +150,7 @@ mod tests {
             session_id: "session-12345678",
             local_ephemeral: &b,
             remote_ephemeral_spki: &a_pub,
+            expected_remote_identity_spki: a_spki.as_bytes(),
             initiator_identity_spki: a_spki.as_bytes(),
             responder_identity_spki: b_spki.as_bytes(),
             initiator_ephemeral_spki: &a_pub,
@@ -175,6 +197,7 @@ mod tests {
             session_id: "session-12345678",
             local_ephemeral: &key,
             remote_ephemeral_spki: &[],
+            expected_remote_identity_spki: &[],
             initiator_identity_spki: &[],
             responder_identity_spki: &[],
             initiator_ephemeral_spki: &[],
