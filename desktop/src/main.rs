@@ -6,6 +6,7 @@ mod session_gate;
 mod approved_channel;
 mod outbound_connection;
 mod handshake_verifier;
+mod verified_session;
 use protocol::{Envelope, MessageKind};
 
 fn main() {
