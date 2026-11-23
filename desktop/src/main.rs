@@ -7,6 +7,7 @@ mod approved_channel;
 mod outbound_connection;
 mod handshake_verifier;
 mod verified_session;
+mod session_transcript;
 use protocol::{Envelope, MessageKind};
 
 fn main() {
