@@ -3,7 +3,6 @@ use hkdf::Hkdf;
 use p256::{PublicKey, SecretKey, ecdh::diffie_hellman, pkcs8::{DecodePublicKey, EncodePublicKey}};
 use rand_core::{OsRng, RngCore};
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
 
 /// Draft interoperability primitives; NOT an authenticated transport.
 pub struct EphemeralKey {
@@ -51,7 +50,7 @@ pub struct SessionCipher {
     cipher: Aes256Gcm,
     aad: Vec<u8>,
     next_sequence: u64,
-    seen: HashSet<u64>,
+    expected_inbound_sequence: u64,
 }
 
 impl SessionCipher {
@@ -63,7 +62,7 @@ impl SessionCipher {
             cipher: Aes256Gcm::new_from_slice(key).map_err(|_| "invalid key")?,
             aad: authenticated_transcript.to_vec(),
             next_sequence: 0,
-            seen: HashSet::new(),
+            expected_inbound_sequence: 0,
         })
     }
 
@@ -87,14 +86,17 @@ impl SessionCipher {
     pub fn decrypt(&mut self, frame: &[u8]) -> Result<Vec<u8>, &'static str> {
         if !(36..=60_036).contains(&frame.len()) { return Err("invalid frame length"); }
         let sequence = u64::from_be_bytes(frame[..8].try_into().map_err(|_| "invalid sequence")?);
-        if sequence > i64::MAX as u64 || self.seen.contains(&sequence) {
-            return Err("invalid or replayed sequence");
+        // TCP frames must arrive in order. Reject gaps, reordering and replay
+        // without retaining an unbounded set of all received sequence numbers.
+        if sequence != self.expected_inbound_sequence {
+            return Err("out-of-order or replayed sequence");
         }
         let mut aad = self.aad.clone();
         aad.extend_from_slice(&frame[..8]);
         let plaintext = self.cipher.decrypt(Nonce::from_slice(&frame[8..20]),
             Payload { msg: &frame[20..], aad: &aad }).map_err(|_| "authentication failed")?;
-        self.seen.insert(sequence);
+        self.expected_inbound_sequence = self.expected_inbound_sequence.checked_add(1)
+            .ok_or("inbound sequence exhausted")?;
         Ok(plaintext)
     }
 }
@@ -125,6 +127,19 @@ mod tests {
         let mut altered = sender.encrypt(b"hello").unwrap();
         altered[21] ^= 1;
         assert!(receiver.decrypt(&altered).is_err());
+    }
+
+    #[test]
+    fn rejects_out_of_order_frames_without_consuming_expected_sequence() {
+        let key = [3u8; 32];
+        let mut sender = SessionCipher::new(&key, b"ordered transcript").unwrap();
+        let mut receiver = SessionCipher::new(&key, b"ordered transcript").unwrap();
+        let first = sender.encrypt(b"first").unwrap();
+        let second = sender.encrypt(b"second").unwrap();
+        assert!(receiver.decrypt(&second).is_err());
+        assert_eq!(receiver.decrypt(&first).unwrap(), b"first");
+        assert_eq!(receiver.decrypt(&second).unwrap(), b"second");
+        assert!(receiver.decrypt(&first).is_err());
     }
 
     #[test]
