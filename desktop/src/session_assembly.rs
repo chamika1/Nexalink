@@ -123,6 +123,41 @@ mod tests {
         let mut bytes = Vec::new();
         channel.send(&mut bytes, b"approved message").unwrap();
         assert!(!bytes.windows(b"approved message".len()).any(|w| w == b"approved message"));
+        // The responder independently verifies the same signed transcript,
+        // approves locally, then decrypts the initiator's directional frame.
+        let responder = SignedSession {
+            session_id: "session-12345678",
+            local_ephemeral: &b,
+            remote_ephemeral_spki: &a_pub,
+            initiator_identity_spki: a_spki.as_bytes(),
+            responder_identity_spki: b_spki.as_bytes(),
+            initiator_ephemeral_spki: &a_pub,
+            responder_ephemeral_spki: &b_pub,
+            initiator_nonce: &na,
+            responder_nonce: &nb,
+            local_signature: b_sig.as_bytes(),
+            remote_signature: a_sig.as_bytes(),
+            local_is_initiator: false,
+        };
+        let mut responder_replay = HandshakeReplayGuard::new(32).unwrap();
+        let mut peer = assemble_approved_channel(
+            responder, &mut responder_replay, true, Duration::from_secs(60)
+        ).unwrap();
+        assert_eq!(
+            peer.receive(&mut std::io::Cursor::new(bytes)).unwrap(),
+            b"approved message"
+        );
+        let mut reply = Vec::new();
+        peer.send(&mut reply, b"encrypted reply").unwrap();
+        assert_eq!(
+            channel.receive(&mut std::io::Cursor::new(reply)).unwrap(),
+            b"encrypted reply"
+        );
+        peer.close();
+        assert_eq!(
+            peer.send(&mut Vec::new(), b"blocked").unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
         assert_eq!(assemble_approved_channel(
             request(), &mut replay, true, Duration::from_secs(60)
         ).err().unwrap().kind(), io::ErrorKind::PermissionDenied);
