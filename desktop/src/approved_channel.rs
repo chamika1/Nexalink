@@ -39,7 +39,15 @@ impl ApprovedChannel {
         if !self.gate.may_exchange_data() {
             return Err(io::Error::new(io::ErrorKind::PermissionDenied, "local consent required"));
         }
-        secure_frame::send(output, &mut self.outbound, &self.session_id, plaintext)
+        match secure_frame::send(output, &mut self.outbound, &self.session_id, plaintext) {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                // A partial write desynchronizes the encrypted stream.
+                // Never reuse the advanced cipher sequence after failure.
+                self.close();
+                Err(error)
+            }
+        }
     }
 
     pub fn receive<R: Read>(&mut self, input: &mut R) -> io::Result<Vec<u8>> {
@@ -119,6 +127,30 @@ mod tests {
         wire[start] = b'X';
         assert_eq!(channel.receive(&mut Cursor::new(wire)).unwrap_err().kind(), io::ErrorKind::InvalidData);
         assert_eq!(channel.send(&mut Vec::new(), b"after invalid frame").unwrap_err().kind(), io::ErrorKind::PermissionDenied);
+    }
+
+    #[test]
+    fn partial_write_revokes_session_and_prevents_retry() {
+        struct FailingWriter { written: usize }
+        impl Write for FailingWriter {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                if self.written > 0 {
+                    return Err(io::Error::new(io::ErrorKind::BrokenPipe, "disconnect"));
+                }
+                let count = bytes.len().min(2);
+                self.written += count;
+                Ok(count)
+            }
+            fn flush(&mut self) -> io::Result<()> { Ok(()) }
+        }
+        let mut channel = channel();
+        channel.gate_mut().identity_verified().unwrap();
+        channel.gate_mut().approve_locally(Duration::from_secs(60)).unwrap();
+        let mut writer = FailingWriter { written: 0 };
+        assert_eq!(channel.send(&mut writer, b"message").unwrap_err().kind(),
+            io::ErrorKind::BrokenPipe);
+        assert_eq!(channel.send(&mut Vec::new(), b"retry").unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied);
     }
 
     #[test]
