@@ -134,6 +134,18 @@ mod tests {
         assert_eq!(assemble_approved_channel(
             rejected, &mut pin_replay, true, Duration::from_secs(60)
         ).err().unwrap().kind(), io::ErrorKind::PermissionDenied);
+        // A forged identity pin must not consume the legitimate handshake's
+        // replay slot. The trusted peer can still be approved independently.
+        let mut recovered = assemble_approved_channel(
+            request(), &mut pin_replay, true, Duration::from_secs(60)
+        ).unwrap();
+        recovered.close();
+        assert_eq!(recovered.send(&mut Vec::new(), b"revoked")
+            .unwrap_err().kind(), io::ErrorKind::PermissionDenied);
+        // Once a valid handshake has been accepted, its replay is rejected.
+        assert_eq!(assemble_approved_channel(
+            request(), &mut pin_replay, true, Duration::from_secs(60)
+        ).err().unwrap().kind(), io::ErrorKind::PermissionDenied);
         let mut replay = HandshakeReplayGuard::new(32).unwrap();
         assert_eq!(assemble_approved_channel(
             request(), &mut replay, false, Duration::from_secs(60)
