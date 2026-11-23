@@ -8,6 +8,7 @@ mod outbound_connection;
 mod handshake_verifier;
 mod verified_session;
 mod session_transcript;
+mod handshake_replay;
 use protocol::{Envelope, MessageKind};
 
 fn main() {
