@@ -10,6 +10,7 @@ mod verified_session;
 mod session_transcript;
 mod handshake_replay;
 mod session_assembly;
+mod pairing_registry;
 #[cfg(test)]
 mod loopback_integration;
 use protocol::{Envelope, MessageKind};
