@@ -1,6 +1,12 @@
 package com.nexalink.app.security
 
+import java.security.AlgorithmParameters
+import java.security.KeyFactory
 import java.security.MessageDigest
+import java.security.interfaces.ECPublicKey
+import java.security.spec.ECGenParameterSpec
+import java.security.spec.ECParameterSpec
+import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
 /**
@@ -15,10 +21,10 @@ data class PairingInvitation(
 ) {
     fun serialize(): String {
         require(version == 1)
-        require(deviceName.isNotBlank() && deviceName.length <= 64)
-        require(encodedPublicKey.length <= 4096)
-        val name = Base64.getUrlEncoder().withoutPadding()
-            .encodeToString(deviceName.toByteArray(Charsets.UTF_8))
+        val nameBytes = deviceName.toByteArray(Charsets.UTF_8)
+        require(nameBytes.size <= 64 && deviceName.isNotBlank() && deviceName.none(Char::isISOControl))
+        validatePublicKey(encodedPublicKey)
+        val name = Base64.getUrlEncoder().withoutPadding().encodeToString(nameBytes)
         return "nexalink:pair:1:$name:$encodedPublicKey"
     }
 
@@ -29,6 +35,24 @@ data class PairingInvitation(
     }
 
     companion object {
+        private val p256 by lazy {
+            AlgorithmParameters.getInstance("EC").apply {
+                init(ECGenParameterSpec("secp256r1"))
+            }.getParameterSpec(ECParameterSpec::class.java)
+        }
+
+        private fun validatePublicKey(encoded: String) {
+            require(encoded.length <= 684) { "Invalid public key" }
+            val bytes = Base64.getUrlDecoder().decode(encoded)
+            val key = runCatching {
+                KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(bytes)) as ECPublicKey
+            }.getOrElse { throw IllegalArgumentException("Invalid public key", it) }
+            val params = key.params
+            require(params.curve == p256.curve && params.generator == p256.generator &&
+                params.order == p256.order && params.cofactor == p256.cofactor &&
+                bytes.contentEquals(key.encoded)) { "Expected a P-256 public key" }
+        }
+
         fun parse(raw: String): PairingInvitation {
             require(raw.length <= 6000) { "Invitation too long" }
             val parts = raw.split(':')
@@ -37,9 +61,9 @@ data class PairingInvitation(
             val nameBytes = Base64.getUrlDecoder().decode(parts[3])
             require(nameBytes.size in 1..64) { "Invalid device name" }
             val name = nameBytes.toString(Charsets.UTF_8)
-            require(name.isNotBlank()) { "Invalid device name" }
-            val keyBytes = Base64.getUrlDecoder().decode(parts[4])
-            require(keyBytes.size in 64..512) { "Invalid public key" }
+            require(name.toByteArray(Charsets.UTF_8).contentEquals(nameBytes) &&
+                name.isNotBlank() && name.none(Char::isISOControl)) { "Invalid device name" }
+            validatePublicKey(parts[4])
             return PairingInvitation(1, name, parts[4])
         }
     }
