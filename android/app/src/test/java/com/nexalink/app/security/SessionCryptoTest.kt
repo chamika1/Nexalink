@@ -31,6 +31,29 @@ class SessionCryptoTest {
         assertThrows(AEADBadTagException::class.java) { receiver.decrypt(altered) }
     }
 
+    @Test fun rejectsOutOfOrderWithoutConsumingExpectedSequence() {
+        val key = SessionCrypto.deriveKey(
+            SessionCrypto.ephemeralKeyPair(), SessionCrypto.ephemeralKeyPair().public.encoded,
+            "sequence-test".toByteArray(), true
+        )
+        val sender = SessionCipher(key, "sequence-test".toByteArray())
+        val receiver = SessionCipher(key, "sequence-test".toByteArray())
+        val first = sender.encrypt("first".toByteArray())
+        val second = sender.encrypt("second".toByteArray())
+        assertThrows(IllegalArgumentException::class.java) { receiver.decrypt(second) }
+        assertEquals("first", String(receiver.decrypt(first)))
+        assertEquals("second", String(receiver.decrypt(second)))
+        assertThrows(IllegalArgumentException::class.java) { receiver.decrypt(first) }
+    }
+
+    @Test fun enforcesWindowsPayloadLimit() {
+        val key = javax.crypto.spec.SecretKeySpec(ByteArray(32) { 3 }, "AES")
+        val cipher = SessionCipher(key, "limit-test".toByteArray())
+        assertEquals(48_036, cipher.encrypt(ByteArray(48_000)).size)
+        assertThrows(IllegalArgumentException::class.java) { cipher.encrypt(ByteArray(48_001)) }
+        assertThrows(IllegalArgumentException::class.java) { cipher.decrypt(ByteArray(48_037)) }
+    }
+
     @Test fun wrongTranscriptFailsAuthentication() {
         val a = SessionCrypto.ephemeralKeyPair()
         val b = SessionCrypto.ephemeralKeyPair()

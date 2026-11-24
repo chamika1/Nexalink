@@ -14,7 +14,7 @@ class ApprovedOutboundConnectionTest {
         "authenticated test transcript".toByteArray()
     )
 
-    @Test fun refusesConnectionWithoutConsent() {
+    @Test fun refusesConnectionWithoutSessionConsent() {
         val consent = SessionConsent()
         assertThrows(IllegalStateException::class.java) {
             ApprovedOutboundConnection.connect(
@@ -24,17 +24,18 @@ class ApprovedOutboundConnectionTest {
         }
     }
 
-    @Test fun approvalAllowsLoopbackConnectionButRevocationBlocksSending() {
+    @Test fun approvalAllowsLoopbackConnectionButSessionRevocationBlocksSending() {
         ServerSocket(0).use { listener ->
             val consent = SessionConsent()
             val now = 1_000L
-            consent.approve("peer-1", SessionCapability.CHAT, 60_000, now, true)
+            val session = "session-12345678"
+            consent.approve("peer-1", session, SessionCapability.CHAT, 60_000, now, true)
             ApprovedOutboundConnection.connect(
-                "127.0.0.1", listener.localPort, "peer-1", "session-12345678",
+                "127.0.0.1", listener.localPort, "peer-1", session,
                 consent, cipher(), cipher(), { now }
             ).use { connection ->
                 listener.accept().use {
-                    consent.revoke("peer-1", SessionCapability.CHAT)
+                    consent.revokeSession("peer-1", session)
                     assertThrows(IllegalStateException::class.java) {
                         connection.sendChat("blocked".toByteArray())
                     }
@@ -43,13 +44,24 @@ class ApprovedOutboundConnectionTest {
         }
     }
 
-    @Test fun expiredConsentBlocksConnection() {
+    @Test fun anotherSessionsConsentCannotAuthorizeThisConnection() {
         val consent = SessionConsent()
-        consent.approve("peer-1", SessionCapability.CHAT, 1, 1_000, true)
+        consent.approve("peer-1", "session-87654321", SessionCapability.CHAT, 60_000, 1000, true)
         assertThrows(IllegalStateException::class.java) {
             ApprovedOutboundConnection.connect(
                 "127.0.0.1", 12345, "peer-1", "session-12345678",
-                consent, cipher(), cipher(), { 1_001L }
+                consent, cipher(), cipher(), { 1000 }
+            )
+        }
+    }
+
+    @Test fun expiredConsentBlocksConnection() {
+        val consent = SessionConsent()
+        consent.approve("peer-1", "session-12345678", SessionCapability.CHAT, 1, 1000, true)
+        assertThrows(IllegalStateException::class.java) {
+            ApprovedOutboundConnection.connect(
+                "127.0.0.1", 12345, "peer-1", "session-12345678",
+                consent, cipher(), cipher(), { 1001 }
             )
         }
     }

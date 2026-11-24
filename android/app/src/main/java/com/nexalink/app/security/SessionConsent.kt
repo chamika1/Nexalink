@@ -1,11 +1,12 @@
 package com.nexalink.app.security
 
-/** Each sensitive capability requires separate, expiring, revocable consent. */
+/** Each capability requires separate consent scoped to one peer AND one session. */
 enum class SessionCapability { CHAT, LOCATION, SCREEN_VIEW, REMOTE_INPUT }
 
 data class CapabilityGrant(
     val capability: SessionCapability,
     val peerId: String,
+    val sessionId: String,
     val expiresAtMillis: Long,
     val approvedByUser: Boolean
 ) {
@@ -14,33 +15,44 @@ data class CapabilityGrant(
 }
 
 class SessionConsent {
-    private val grants = mutableMapOf<Pair<String, SessionCapability>, CapabilityGrant>()
+    private val grants = mutableMapOf<Triple<String, String, SessionCapability>, CapabilityGrant>()
 
     @Synchronized
     fun approve(
         peerId: String,
+        sessionId: String,
         capability: SessionCapability,
         durationMillis: Long,
         nowMillis: Long,
         approvedByUser: Boolean
     ) {
-        require(peerId.isNotBlank())
+        require(peerId.isNotBlank() && peerId.length <= 128)
+        require(sessionId.length in 8..128) { "Invalid session id" }
         require(approvedByUser) { "Explicit user approval required" }
         require(durationMillis in 1..900_000L) { "Maximum grant is fifteen minutes" }
         require(nowMillis >= 0) { "Invalid clock value" }
         val expiry = Math.addExact(nowMillis, durationMillis)
-        grants[peerId to capability] = CapabilityGrant(
-            capability, peerId, expiry, true
+        grants[Triple(peerId, sessionId, capability)] = CapabilityGrant(
+            capability, peerId, sessionId, expiry, true
         )
     }
 
     @Synchronized
-    fun allowed(peerId: String, capability: SessionCapability, nowMillis: Long): Boolean =
-        grants[peerId to capability]?.isActive(nowMillis) == true
+    fun allowed(
+        peerId: String,
+        sessionId: String,
+        capability: SessionCapability,
+        nowMillis: Long
+    ): Boolean = grants[Triple(peerId, sessionId, capability)]?.isActive(nowMillis) == true
 
     @Synchronized
-    fun revoke(peerId: String, capability: SessionCapability) {
-        grants.remove(peerId to capability)
+    fun revoke(peerId: String, sessionId: String, capability: SessionCapability) {
+        grants.remove(Triple(peerId, sessionId, capability))
+    }
+
+    @Synchronized
+    fun revokeSession(peerId: String, sessionId: String) {
+        grants.keys.removeAll { it.first == peerId && it.second == sessionId }
     }
 
     @Synchronized

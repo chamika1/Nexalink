@@ -3,34 +3,53 @@ package com.nexalink.app.security
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 import java.security.MessageDigest
-import java.util.Base64
 
-/** Canonical, role-bound pairing transcript. Not a network transport. */
+/**
+ * Canonical NexaLink v1 transcript shared with the Windows Rust implementation.
+ * Field order and big-endian length prefixes are protocol-critical.
+ */
 data class SessionTranscript(
-    val sessionId: String,
-    val initiatorPublicKey: String,
-    val responderPublicKey: String,
-    val initiatorNonce: String,
-    val responderNonce: String
+    val initiatorIdentitySpki: ByteArray,
+    val responderIdentitySpki: ByteArray,
+    val initiatorEphemeralSpki: ByteArray,
+    val responderEphemeralSpki: ByteArray,
+    val initiatorNonce: ByteArray,
+    val responderNonce: ByteArray
 ) {
     fun bytes(): ByteArray {
-        require(sessionId.length in 16..128)
-        val initiatorKey = decode(initiatorPublicKey, 64, 512)
-        val responderKey = decode(responderPublicKey, 64, 512)
-        val firstNonce = decode(initiatorNonce, 32, 32)
-        val secondNonce = decode(responderNonce, 32, 32)
-        require(!initiatorKey.contentEquals(responderKey)) { "Peer identities must differ" }
-        require(!firstNonce.contentEquals(secondNonce)) { "Nonces must differ" }
-        val stream = ByteArrayOutputStream()
-        DataOutputStream(stream).use { out ->
-            out.writeUTF("NexaLink pairing transcript v1")
-            out.writeUTF(sessionId)
-            for (part in listOf(initiatorKey, responderKey, firstNonce, secondNonce)) {
-                out.writeInt(part.size)
-                out.write(part)
+        val keys = listOf(
+            initiatorIdentitySpki, responderIdentitySpki,
+            initiatorEphemeralSpki, responderEphemeralSpki
+        )
+        require(keys.all { it.isNotEmpty() && it.size <= MAX_KEY_BYTES }) {
+            "Invalid transcript public key length"
+        }
+        require(!initiatorIdentitySpki.contentEquals(responderIdentitySpki)) {
+            "Peer identities must differ"
+        }
+        require(!initiatorEphemeralSpki.contentEquals(responderEphemeralSpki)) {
+            "Ephemeral keys must differ"
+        }
+        require(initiatorNonce.size == NONCE_BYTES && responderNonce.size == NONCE_BYTES) {
+            "Invalid transcript nonce length"
+        }
+        require(!initiatorNonce.contentEquals(responderNonce)) { "Nonces must differ" }
+
+        val output = ByteArrayOutputStream()
+        output.write(DOMAIN)
+        DataOutputStream(output).use { data ->
+            listOf(
+                initiatorIdentitySpki, responderIdentitySpki,
+                initiatorEphemeralSpki, responderEphemeralSpki,
+                initiatorNonce, responderNonce
+            ).forEach { field ->
+                data.writeInt(field.size)
+                data.write(field)
             }
         }
-        return stream.toByteArray()
+        return output.toByteArray().also {
+            require(it.size <= MAX_TRANSCRIPT_BYTES) { "Transcript too long" }
+        }
     }
 
     fun verificationCode(): String {
@@ -40,10 +59,11 @@ data class SessionTranscript(
         return (number % 1_000_000).toString().padStart(6, '0')
     }
 
-    private fun decode(value: String, min: Int, max: Int): ByteArray {
-        require(value.length <= 1000)
-        val bytes = Base64.getUrlDecoder().decode(value)
-        require(bytes.size in min..max)
-        return bytes
+    companion object {
+        private const val MAX_KEY_BYTES = 2048
+        private const val NONCE_BYTES = 32
+        private const val MAX_TRANSCRIPT_BYTES = 8192
+        private val DOMAIN = "nexalink-authenticated-session-v1\u0000"
+            .toByteArray(Charsets.US_ASCII)
     }
 }

@@ -8,9 +8,8 @@ import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
 /**
- * Transcript signature primitives for mutually authenticated pairing.
- * Trust requires verifying BOTH signatures, an out-of-band code and
- * explicit approval. This class alone does not establish a session.
+ * Transcript signature primitives. The remote key must be pinned separately;
+ * a valid signature from an untrusted key never establishes trust.
  */
 class SessionAuthenticator {
     fun sign(transcript: SessionTranscript): String {
@@ -24,14 +23,31 @@ class SessionAuthenticator {
 
     fun verify(transcript: SessionTranscript, initiator: Boolean, signature: String): Boolean {
         return runCatching {
-            val encoded = if (initiator) transcript.initiatorPublicKey else transcript.responderPublicKey
-            val key = KeyFactory.getInstance("EC").generatePublic(
-                X509EncodedKeySpec(Base64.getUrlDecoder().decode(encoded))
-            )
-            val verifier = Signature.getInstance("SHA256withECDSA")
-            verifier.initVerify(key)
-            verifier.update(transcript.bytes())
-            verifier.verify(Base64.getUrlDecoder().decode(signature))
+            val identity = if (initiator) transcript.initiatorIdentitySpki
+                else transcript.responderIdentitySpki
+            verifySignature(identity, transcript.bytes(), Base64.getUrlDecoder().decode(signature))
         }.getOrDefault(false)
+    }
+
+    companion object {
+        fun verifySignature(
+            identitySpki: ByteArray,
+            transcriptBytes: ByteArray,
+            signatureDer: ByteArray
+        ): Boolean {
+            if (identitySpki.isEmpty() || identitySpki.size > 2048 ||
+                transcriptBytes.isEmpty() || transcriptBytes.size > 8192 ||
+                signatureDer.isEmpty() || signatureDer.size > 256) return false
+            return try {
+                val key = KeyFactory.getInstance("EC")
+                    .generatePublic(X509EncodedKeySpec(identitySpki))
+                val verifier = Signature.getInstance("SHA256withECDSA")
+                verifier.initVerify(key)
+                verifier.update(transcriptBytes)
+                verifier.verify(signatureDer)
+            } catch (_: Exception) {
+                false
+            }
+        }
     }
 }

@@ -61,6 +61,25 @@ mod tests {
     }
 
     #[test]
+    fn matches_shared_android_interoperability_vector() {
+        let a = [1u8; 32];
+        let b = [2u8; 32];
+        let actual = build_transcript(
+            b"alice-id", b"bob-id", b"alice-ephemeral", b"bob-ephemeral", &a, &b
+        ).unwrap();
+        let mut expected = DOMAIN.to_vec();
+        for field in [
+            b"alice-id".as_slice(), b"bob-id".as_slice(),
+            b"alice-ephemeral".as_slice(), b"bob-ephemeral".as_slice(),
+            a.as_slice(), b.as_slice()
+        ] {
+            expected.extend_from_slice(&(field.len() as u32).to_be_bytes());
+            expected.extend_from_slice(field);
+        }
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn reject_reflection_and_malformed_inputs() {
         let a = [1u8; 32];
         let b = [2u8; 32];

@@ -14,9 +14,8 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * Ephemeral ECDH + HKDF-SHA256 + AES-256-GCM primitives.
- * Authentication MUST happen before trusting the derived keys.
- * Session IDs and direction are bound into HKDF context.
+ * P-256 ECDH + HKDF-SHA256 + AES-256-GCM.
+ * HKDF labels and frame layout match desktop/src/crypto.rs.
  */
 object SessionCrypto {
     fun ephemeralKeyPair(): KeyPair =
@@ -26,7 +25,7 @@ object SessionCrypto {
         local: KeyPair,
         remotePublicKey: ByteArray,
         transcript: ByteArray,
-        initiator: Boolean
+        initiatorToResponder: Boolean
     ): SecretKey {
         require(transcript.isNotEmpty() && transcript.size <= 8192)
         val remote = KeyFactory.getInstance("EC")
@@ -41,11 +40,10 @@ object SessionCrypto {
             mac.init(SecretKeySpec(salt, "HmacSHA256"))
             val prk = mac.doFinal(shared)
             try {
-                val label = if (initiator) "nexalink-v1-i2r" else "nexalink-v1-r2i"
-                val info = label.toByteArray(Charsets.US_ASCII) + byteArrayOf(1)
+                val label = if (initiatorToResponder) "nexalink-v1-i2r" else "nexalink-v1-r2i"
                 mac.init(SecretKeySpec(prk, "HmacSHA256"))
-                mac.update(info)
-                return SecretKeySpec(mac.doFinal().copyOf(32), "AES")
+                mac.update(label.toByteArray(Charsets.US_ASCII))
+                return SecretKeySpec(mac.doFinal(byteArrayOf(1)).copyOf(32), "AES")
             } finally {
                 prk.fill(0)
             }
@@ -55,17 +53,20 @@ object SessionCrypto {
     }
 }
 
-/** One directional cipher. The caller must supply the authenticated session transcript as AAD. */
+/**
+ * One directional cipher. TCP ordering is enforced with a single expected
+ * sequence counter, avoiding the unbounded replay set used by the prototype.
+ */
 class SessionCipher(private val key: SecretKey, private val aad: ByteArray) {
     private val random = SecureRandom()
-    private var nextSequence = 0L
-    private val seen = mutableSetOf<Long>()
+    private var nextOutboundSequence = 0L
+    private var nextInboundSequence = 0L
 
     @Synchronized
     fun encrypt(plaintext: ByteArray): ByteArray {
-        require(plaintext.size <= 60_000)
-        require(nextSequence < Long.MAX_VALUE)
-        val sequence = nextSequence++
+        require(plaintext.size <= MAX_PLAINTEXT_BYTES)
+        require(nextOutboundSequence < Long.MAX_VALUE) { "Outbound sequence exhausted" }
+        val sequence = nextOutboundSequence++
         val nonce = ByteArray(12).also(random::nextBytes)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, nonce))
@@ -77,17 +78,25 @@ class SessionCipher(private val key: SecretKey, private val aad: ByteArray) {
 
     @Synchronized
     fun decrypt(frame: ByteArray): ByteArray {
-        require(frame.size in 36..60_036)
+        require(frame.size in MIN_FRAME_BYTES..MAX_FRAME_BYTES) { "Invalid encrypted frame length" }
         val buffer = ByteBuffer.wrap(frame)
         val sequence = buffer.long
-        require(sequence >= 0 && sequence !in seen) { "Replay detected" }
+        require(sequence == nextInboundSequence && sequence < Long.MAX_VALUE) {
+            "Out-of-order or replayed sequence"
+        }
         val nonce = ByteArray(12).also(buffer::get)
         val ciphertext = ByteArray(buffer.remaining()).also(buffer::get)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, nonce))
         cipher.updateAAD(aad + ByteBuffer.allocate(8).putLong(sequence).array())
         val plaintext = cipher.doFinal(ciphertext)
-        seen.add(sequence)
+        nextInboundSequence++
         return plaintext
+    }
+
+    companion object {
+        const val MAX_PLAINTEXT_BYTES = 48_000
+        private const val MIN_FRAME_BYTES = 36
+        private const val MAX_FRAME_BYTES = MAX_PLAINTEXT_BYTES + 36
     }
 }

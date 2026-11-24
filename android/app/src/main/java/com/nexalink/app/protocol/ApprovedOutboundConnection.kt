@@ -8,8 +8,8 @@ import java.net.InetSocketAddress
 import java.net.Socket
 
 /**
- * Outbound-only TCP transport. The caller MUST independently authenticate both
- * identities and the signed handshake transcript before constructing ciphers.
+ * Outbound-only TCP transport. The caller must first complete authenticated
+ * handshake verification and obtain local consent for this exact session.
  * No listener, automatic reconnect, or remote-control capability is provided.
  */
 class ApprovedOutboundConnection private constructor(
@@ -37,8 +37,8 @@ class ApprovedOutboundConnection private constructor(
 
     private fun checkAllowed() {
         check(!closed && !socket.isClosed) { "Connection closed" }
-        check(consent.allowed(peerId, SessionCapability.CHAT, nowMillis())) {
-            "Explicit chat approval required"
+        check(consent.allowed(peerId, sessionId, SessionCapability.CHAT, nowMillis())) {
+            "Explicit approval for this session is required"
         }
     }
 
@@ -46,7 +46,7 @@ class ApprovedOutboundConnection private constructor(
     override fun close() {
         if (!closed) {
             closed = true
-            consent.revoke(peerId, SessionCapability.CHAT)
+            consent.revokeSession(peerId, sessionId)
             socket.close()
         }
     }
@@ -67,8 +67,8 @@ class ApprovedOutboundConnection private constructor(
             require(port in 1..65535)
             require(peerId.isNotBlank() && sessionId.length in 8..128)
             require(timeoutMillis in 1..15_000)
-            check(consent.allowed(peerId, SessionCapability.CHAT, nowMillis())) {
-                "Explicit chat approval required before connecting"
+            check(consent.allowed(peerId, sessionId, SessionCapability.CHAT, nowMillis())) {
+                "Explicit approval for this session is required before connecting"
             }
             val socket = Socket()
             try {
