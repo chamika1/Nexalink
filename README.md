@@ -10,12 +10,12 @@ Local-first, consent-based private device network for **Android and Windows**.
 - Authorized file transfer
 
 ## Project status
-**Phase 1: initial architecture and repository scaffold.** This is not yet a runnable application. E2EE and remote-control functionality have not been implemented or audited.
+The Android prototype has Devices, Chat and Location tabs, with manual, verified pairing between Android devices. The Rust companion exercises the encrypted-session protocol in tests.
 
 ## Structure
-- `android/` — Kotlin + Jetpack Compose client (planned)
-- `desktop/` — Windows-only Rust/Tauri companion (planned)
-- `protocol/` — versioned peer protocol design
+- `android/` — Kotlin and Jetpack Compose client
+- `desktop/` — Rust companion prototype
+- `protocol/` — versioned peer protocol
 - `docs/architecture.md` — trust model, constraints and milestones
 
 ## Privacy and security principles
@@ -26,5 +26,5 @@ Local-first, consent-based private device network for **Android and Windows**.
 - No hidden monitoring, keylogging, or covert remote control
 - Network traversal may require signaling, VPN or encrypted relay infrastructure
 
-## Next milestone
-Implement an Android Jetpack Compose navigation shell with Devices, Chat and Location screens, then build a Windows companion prototype.
+## Try Android pairing
+Build the debug APK using the [Android build guide](docs/android-build.md), then follow the [pairing walkthrough](android/README.md#pair-two-android-devices). The app exchanges pairing data manually and stores verified devices locally. Live messaging, file transfer, location sharing and remote assistance are planned.

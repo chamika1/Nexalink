@@ -29,6 +29,18 @@ class PairingInvitationTest {
         }
     }
 
+    @Test fun rejectsInvalidDerAndDifferentCurve() {
+        val invalidDer = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(91))
+        assertThrows(IllegalArgumentException::class.java) {
+            PairingInvitation.parse("nexalink:pair:1:UEM:$invalidDer")
+        }
+        val key = KeyPairGenerator.getInstance("EC").apply { initialize(384) }.generateKeyPair()
+        val wrongCurve = Base64.getUrlEncoder().withoutPadding().encodeToString(key.public.encoded)
+        assertThrows(IllegalArgumentException::class.java) {
+            PairingInvitation.parse("nexalink:pair:1:UEM:$wrongCurve")
+        }
+    }
+
     @Test fun stateRequiresApprovals() {
         val session = PairingSession("PC", "fingerprint")
         assertThrows(IllegalArgumentException::class.java) { session.verifyFingerprint() }

@@ -18,7 +18,6 @@ Run:
 gradle :android:app:testDebugUnitTest :android:app:assembleDebug
 ```
 
-## Current pairing UI
-Open **Devices → Pair a device**. Generate an invitation QR or copy its text. On another device, paste the invitation and inspect the fingerprint. This is a local preview: no network pairing or authorization is performed.
+## Test pairing
 
-Never assume that merely showing or importing an invitation authenticates a device.
+Install the debug APK on two Android devices and follow the [pairing walkthrough](../android/README.md#pair-two-android-devices). Check that each device appears in the other's Devices list after verification and remains listed after restarting the app. Remove a device and confirm it disappears from the local list.
