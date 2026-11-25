@@ -22,3 +22,11 @@
 1. Android app launches with Devices, Chat, Location navigation.
 2. No sensitive permissions requested at first launch.
 3. Windows companion requires user approval before screen capture.
+
+## Internet peer connections
+
+The target is an Android phone on mobile data and a Windows machine on another network. Both devices act as peers and may initiate or accept a session. The connection roles are assigned per session.
+
+Use HTTPS rendezvous to exchange WebRTC offers and answers and ICE to select a network route. Use STUN for direct candidates. Networks that prevent a direct route require either a clear connection failure in direct-only mode or an optional TURN relay. Application frames remain encrypted and require pinned identities and local consent.
+
+The [rendezvous service](../rendezvous/README.md) implements signaling. It still needs WebRTC integration in both applications and testing across independent networks. The current TCP connection check remains useful for directly reachable addresses.

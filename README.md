@@ -16,6 +16,7 @@ The Android prototype has Devices, Chat and Location tabs, with manual, verified
 - `android/` — Kotlin and Jetpack Compose client
 - `desktop/` — Rust companion prototype
 - `protocol/` — versioned peer protocol
+- `rendezvous/` — WebRTC signaling service for the planned cross-network connection
 - `docs/architecture.md` — trust model, constraints and milestones
 
 ## Privacy and security principles
