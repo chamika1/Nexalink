@@ -10,7 +10,7 @@ Local-first, consent-based private device network for **Android and Windows**.
 - Authorized file transfer
 
 ## Project status
-The Android prototype has Devices, Chat and Location tabs, with manual, verified pairing between Android devices. The Rust companion exercises the encrypted-session protocol in tests.
+The Android prototype has Devices, Chat and Location tabs, with manual, verified pairing between Android devices. The Rust companion and Android app also support a one-time authenticated connection check over a reachable IP address.
 
 ## Structure
 - `android/` — Kotlin and Jetpack Compose client
@@ -27,4 +27,4 @@ The Android prototype has Devices, Chat and Location tabs, with manual, verified
 - Network traversal may require signaling, VPN or encrypted relay infrastructure
 
 ## Try Android pairing
-Build the debug APK using the [Android build guide](docs/android-build.md), then follow the [pairing walkthrough](android/README.md#pair-two-android-devices). The app exchanges pairing data manually and stores verified devices locally. Live messaging, file transfer, location sharing and remote assistance are planned.
+Build the debug APK using the [Android build guide](docs/android-build.md), then follow the [pairing walkthrough](android/README.md#pair-two-android-devices). The app exchanges pairing data manually and stores verified devices locally. To try the encrypted Android–Windows probe, follow the [Windows connection walkthrough](desktop/README.md#check-a-connection-from-android). Live messaging, file transfer, location sharing and remote assistance are planned.

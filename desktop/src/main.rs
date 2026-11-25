@@ -11,12 +11,24 @@ mod session_transcript;
 mod handshake_replay;
 mod session_assembly;
 mod pairing_registry;
+mod wire_handshake;
 #[cfg(test)]
 mod loopback_integration;
-use protocol::{Envelope, MessageKind};
+mod connection_demo;
 
-fn main() {
-    let hello = Envelope::new(MessageKind::Hello, "local-prototype".into());
-    println!("{}", serde_json::to_string_pretty(&hello).expect("serialize hello"));
-    println!("NexaLink Windows prototype: no network listener or remote control enabled.");
+fn main() -> std::process::ExitCode {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    if let [command, address] = args.as_slice() {
+        if command == "listen" {
+            match address.parse().map_err(std::io::Error::other).and_then(connection_demo::run) {
+                Ok(()) => return std::process::ExitCode::SUCCESS,
+                Err(error) => {
+                    eprintln!("Connection check failed: {error}");
+                    return std::process::ExitCode::FAILURE;
+                }
+            }
+        }
+    }
+    println!("Usage: nexalink-windows-agent listen <local-ip:port>");
+    if args.is_empty() { std::process::ExitCode::SUCCESS } else { std::process::ExitCode::FAILURE }
 }

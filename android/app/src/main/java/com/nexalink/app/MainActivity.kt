@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.nexalink.app.ui.PairingScreen
+import com.nexalink.app.ui.ConnectionCheck
 import com.nexalink.app.security.TrustedPeerStore
 
 private enum class HomeTab(val title: String) {
@@ -86,7 +87,7 @@ private fun NexaLinkHome() {
                     Text("Location permission is not requested by this prototype.")
                 }
             }
-            Text("Prototype v0.1 • No active connections", style = MaterialTheme.typography.labelMedium)
+            Text("Prototype v0.1", style = MaterialTheme.typography.labelMedium)
         }
     }
 }
@@ -96,6 +97,7 @@ private fun PairedDevices() {
     val context = LocalContext.current
     val store = remember(context) { TrustedPeerStore(context) }
     var peers by remember(store) { mutableStateOf(store.list()) }
+    var connectionPeer by remember { mutableStateOf<TrustedPeerStore.Peer?>(null) }
     var selectedPeer by remember { mutableStateOf<TrustedPeerStore.Peer?>(null) }
     var error by remember { mutableStateOf(false) }
 
@@ -103,10 +105,17 @@ private fun PairedDevices() {
         modifier = Modifier.verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        val connecting = connectionPeer
+        if (connecting != null) {
+            TextButton(onClick = { connectionPeer = null }) { Text("Back to trusted devices") }
+            ConnectionCheck(connecting)
+            return@Column
+        }
         if (peers.isEmpty()) Text("No verified devices yet.")
         for (peer in peers) {
             Text(peer.name, style = MaterialTheme.typography.titleMedium)
             Text(peer.id)
+            TextButton(onClick = { connectionPeer = peer }) { Text("Check connection") }
             TextButton(onClick = { selectedPeer = peer }) { Text("Remove device") }
         }
         if (error) Text("Could not remove the device.")

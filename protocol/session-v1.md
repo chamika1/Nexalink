@@ -1,6 +1,6 @@
 # Authenticated session primitives — v1
 
-Status: **cross-platform transcript and authenticated key-derivation primitives with unit tests**. This is not yet a live Android-to-Windows handshake or a production transport.
+Status: **cross-platform transcript, key derivation and bounded handshake exchange**. This is not yet a live Android-to-Windows handshake or a production transport.
 
 ## Canonical signed transcript
 
@@ -26,6 +26,10 @@ Android and Windows MUST sign the exact same bytes:
 - Each capability (chat, location, screen view, remote input) requires a separate local approval. A grant expires within 15 minutes and is revoked when that session closes.
 - A grant for one session never authorizes a later connection to the same peer.
 
-## Still required before live pairing
+## TCP handshake exchange
 
-The transcript verifier and cipher factory are library primitives, not a network handshake. A bounded wire handshake, Android/Windows transport integration, safe trusted-key persistence on Windows, pairing UI confirmation flow, and cross-language live integration tests are still required. No unattended listener, auto-approval, hidden control, screen capture or remote input is enabled.
+An initiator sends ASCII `NXL1`, its 32-byte nonce and its ephemeral SPKI. The responder sends the same header with its nonce and ephemeral SPKI, followed by its signature. The initiator verifies the signature against its preselected pin and returns its own signature. SPKIs and DER signatures have two-byte unsigned big-endian length prefixes and maximum lengths of 2,048 and 256 bytes, respectively. Identity SPKIs come from local identity and pairing stores on each side.
+
+Once each side verifies the peer signature, it can show the comparison code for local confirmation. The encrypted frame session ID is the lowercase hexadecimal SHA-256 of the signed transcript. The handshake messages carry no application data. Callers must use dedicated streams with read and write deadlines and close on error or declined confirmation. Application data requires local capability approval.
+
+The Android connection check uses a Keystore identity and verified peer, then reuses the socket for one approved encrypted request and reply. The Windows foreground companion creates an in-memory identity, binds a user-selected local address and accepts one connection. Persistent Windows identity and peer storage, internet rendezvous and Android-to-Windows physical-device testing are remaining work.
