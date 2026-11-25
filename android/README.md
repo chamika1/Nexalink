@@ -11,3 +11,7 @@ The Kotlin and Jetpack Compose app opens to Devices, Chat and Location. Build an
 5. Open **Back to devices** to see saved devices. To revoke a saved identity, choose **Remove device** and confirm.
 
 Invitation QR codes can be displayed. Exchange text for this workflow. Each device stores its own trust registry. Chat and location are placeholders.
+
+## Check a Windows connection
+
+Use **Devices → Check connection** for the verified Windows peer once its foreground listener is ready. Follow the [Windows walkthrough](../desktop/README.md#check-a-connection-from-android) to exchange invitations, compare the session code, and run the encrypted check.
