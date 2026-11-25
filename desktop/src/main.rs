@@ -11,6 +11,7 @@ mod session_transcript;
 mod handshake_replay;
 mod session_assembly;
 mod pairing_registry;
+mod wire_handshake;
 #[cfg(test)]
 mod loopback_integration;
 use protocol::{Envelope, MessageKind};
