@@ -14,4 +14,9 @@ Invitation QR codes can be displayed. Exchange text for this workflow. Each devi
 
 ## Check a Windows connection
 
-Use **Devices → Check connection** for the verified Windows peer once its foreground listener is ready. Follow the [Windows walkthrough](../desktop/README.md#check-a-connection-from-android) to exchange invitations, compare the session code, and run the encrypted check.
+Use **Devices → Check local connection** for the verified Windows peer once its foreground listener is ready. Follow the [Windows walkthrough](../desktop/README.md#check-a-connection-from-android) to exchange invitations, compare the session code, and run the encrypted check.
+
+
+## Check a Windows connection over the internet
+
+After pairing, choose **Check internet connection** and enter the same HTTPS signaling service URL as the Windows peer. Create a room or join with the other device's private room code. Compare the session codes and approve the encrypted check. See the [Windows WebRTC walkthrough](../desktop/README.md#webrtc-companion-preview) for the companion commands.

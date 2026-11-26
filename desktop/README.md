@@ -11,3 +11,11 @@ The Rust companion can accept one foreground, authenticated connection and retur
 5. Both devices report whether the encrypted check passed. The companion exits after the attempt.
 
 Keep the terminal open throughout pairing and checking. Each companion run creates a fresh temporary Windows identity, so a restart requires pairing again. Both devices need a route to each other. A local network or a configured VPN can supply that route. The companion does not provide NAT traversal or a relay.
+
+## WebRTC companion preview
+
+Keep `nexalink-rtcbridge.exe` beside `nexalink-windows-agent.exe`. The Windows CI artifact includes both binaries. Use `webrtc-create <https-signaling-url>` to create a room or `webrtc-join <https-signaling-url>` to enter a room created by the other peer. The signaling URL must have a certificate trusted by Windows. Pair the app identity and exchange the private room code before comparing the session code. ICE uses STUN to find a direct route.
+
+On Android, select the paired Windows device, tap **Check internet connection**, and enter the same HTTPS signaling URL. If Windows created the room, paste the private code into Android and tap **Join room**. If Windows is joining, tap **Create room** on Android and paste its code into Windows. Compare the session codes, approve on Windows, and tap **Codes match. Approve check** on Android.
+
+Either device can create the WebRTC room. The desktop responds to the NexaLink identity handshake in both room roles. Deploy the signaling service on your own reachable HTTPS endpoint. The connection uses direct ICE candidates. Testing with a physical Android phone on mobile data and a Windows PC on a separate network is pending.

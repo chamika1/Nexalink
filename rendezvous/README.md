@@ -1,6 +1,6 @@
 # Internet rendezvous
 
-NexaLink's Android and Windows peers will use this service to exchange WebRTC connection descriptions. Either device can create a room and initiate the connection. The other device uses the room invitation to answer. The service carries setup messages only. The peers exchange application data over their authenticated WebRTC data channel.
+NexaLink's Android and Windows peers use this service to exchange WebRTC connection descriptions. Either device can create a room and initiate the connection. The other device uses the room invitation to answer. The service carries setup messages only. The peers exchange application data over their authenticated WebRTC data channel.
 
 ## Run locally
 
@@ -17,4 +17,4 @@ The room credentials grant access only to signaling. Before exchanging user data
 
 ## Integration status
 
-The signaling service and its HTTP tests are implemented. Android and Windows still need WebRTC data-channel integration. Direct internet connections will require ICE with STUN. Some NAT and firewall combinations prevent direct traffic. For those cases, strictly direct mode must report that no route is available. An optional TURN fallback can carry encrypted traffic if relay operation is acceptable.
+The signaling service and its HTTP tests are implemented. The Windows companion and Android app can create or join WebRTC rooms. Physical-device testing across separate networks is pending. Direct internet connections will require ICE with STUN. Some NAT and firewall combinations prevent direct traffic. For those cases, strictly direct mode must report that no route is available. An optional TURN fallback can carry encrypted traffic if relay operation is acceptable.

@@ -28,5 +28,6 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.ui:ui")
     implementation("com.google.zxing:core:3.5.3")
+    implementation("io.github.webrtc-sdk:android:150.7871.09")
     testImplementation("junit:junit:4.13.2")
 }

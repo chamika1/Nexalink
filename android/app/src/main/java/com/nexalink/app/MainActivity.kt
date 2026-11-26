@@ -97,6 +97,7 @@ private fun PairedDevices() {
     val context = LocalContext.current
     val store = remember(context) { TrustedPeerStore(context) }
     var peers by remember(store) { mutableStateOf(store.list()) }
+    var internetConnection by remember { mutableStateOf(false) }
     var connectionPeer by remember { mutableStateOf<TrustedPeerStore.Peer?>(null) }
     var selectedPeer by remember { mutableStateOf<TrustedPeerStore.Peer?>(null) }
     var error by remember { mutableStateOf(false) }
@@ -108,14 +109,15 @@ private fun PairedDevices() {
         val connecting = connectionPeer
         if (connecting != null) {
             TextButton(onClick = { connectionPeer = null }) { Text("Back to trusted devices") }
-            ConnectionCheck(connecting)
+            ConnectionCheck(connecting, internetConnection)
             return@Column
         }
         if (peers.isEmpty()) Text("No verified devices yet.")
         for (peer in peers) {
             Text(peer.name, style = MaterialTheme.typography.titleMedium)
             Text(peer.id)
-            TextButton(onClick = { connectionPeer = peer }) { Text("Check connection") }
+            TextButton(onClick = { internetConnection = true; connectionPeer = peer }) { Text("Check internet connection") }
+            TextButton(onClick = { internetConnection = false; connectionPeer = peer }) { Text("Check local connection") }
             TextButton(onClick = { selectedPeer = peer }) { Text("Remove device") }
         }
         if (error) Text("Could not remove the device.")
