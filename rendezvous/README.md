@@ -17,4 +17,4 @@ The room credentials grant access only to signaling. Before exchanging user data
 
 ## Integration status
 
-The signaling service and its HTTP tests are implemented. Android and Windows still need WebRTC data-channel integration. Direct internet connections will require ICE with STUN. Some NAT and firewall combinations prevent direct traffic. For those cases, strictly direct mode must report that no route is available. An optional TURN fallback can carry encrypted traffic if relay operation is acceptable.
+The signaling service and its HTTP tests are implemented. The Windows companion can create or join a WebRTC room. The Android app still needs native WebRTC data-channel integration. Direct internet connections will require ICE with STUN. Some NAT and firewall combinations prevent direct traffic. For those cases, strictly direct mode must report that no route is available. An optional TURN fallback can carry encrypted traffic if relay operation is acceptable.

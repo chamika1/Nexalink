@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - 'desktop/**'
+      - 'rtcbridge/**'
       - '.github/workflows/windows-agent.yml'
   pull_request:
     paths:
       - 'desktop/**'
+      - 'rtcbridge/**'
       - '.github/workflows/windows-agent.yml'
 
 concurrency:
@@ -29,10 +31,19 @@ jobs:
         run: cargo test
       - name: Build Windows agent prototype
         run: cargo build --release
-      - name: Upload Windows executable
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: rtcbridge/go.mod
+          cache-dependency-path: rtcbridge/go.sum
+      - name: Build WebRTC bridge
+        working-directory: rtcbridge
+        run: go build -o ../desktop/target/release/nexalink-rtcbridge.exe .
+      - name: Upload Windows executables
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: nexalink-windows-agent-prototype
-          path: desktop/target/release/nexalink-windows-agent.exe
+          path: |
+            desktop/target/release/nexalink-windows-agent.exe
+            desktop/target/release/nexalink-rtcbridge.exe
           retention-days: 7
