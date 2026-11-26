@@ -29,4 +29,4 @@ The target is an Android phone on mobile data and a Windows machine on another n
 
 Use HTTPS rendezvous to exchange WebRTC offers and answers and ICE to select a network route. Use STUN for direct candidates. Networks that prevent a direct route require either a clear connection failure in direct-only mode or an optional TURN relay. Application frames remain encrypted and require pinned identities and local consent.
 
-The [rendezvous service](../rendezvous/README.md) implements signaling. The Windows preview supports both negotiation roles through a WebRTC bridge. Android integration and testing across independent networks are pending. The current TCP connection check remains useful for directly reachable addresses.
+The [rendezvous service](../rendezvous/README.md) implements signaling. The Windows preview uses a WebRTC bridge and Android uses a native WebRTC library. Both support creating and joining rooms. Testing across independent networks is pending. The current TCP connection check remains useful for directly reachable addresses.

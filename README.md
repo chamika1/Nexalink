@@ -10,13 +10,13 @@ Local-first, consent-based private device network for **Android and Windows**.
 - Authorized file transfer
 
 ## Project status
-The Android prototype has Devices, Chat and Location tabs, with manual, verified pairing between Android devices. The Rust companion and Android app also support a one-time authenticated connection check over a reachable IP address.
+The Android prototype has Devices, Chat and Location tabs, with manual, verified pairing between Android devices. The Rust companion and Android app support a one-time authenticated connection check over WebRTC using an HTTPS signaling service, or over TCP using a reachable IP address.
 
 ## Structure
 - `android/` — Kotlin and Jetpack Compose client
 - `desktop/` — Rust companion prototype
 - `protocol/` — versioned peer protocol
-- `rendezvous/` — WebRTC signaling service for the planned cross-network connection
+- `rendezvous/` — WebRTC signaling service for cross-network connection setup
 - `docs/architecture.md` — trust model, constraints and milestones
 
 ## Privacy and security principles
